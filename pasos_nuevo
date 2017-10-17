@@ -1,0 +1,490 @@
+select rhel 7.2
+select m3.x2alrge
+
+
+
+
+EN CADA SERVER :
+
+sudo mkfs.ext4 /dev/xvdb
+sudo mkfs.ext4 /dev/xvdc
+
+sudo mkdir /mnt/disco2
+sudo mkdir /mnt/disco1
+
+[ec2-user@ip-172-31-8-198 ~]$ sudo blkid
+/dev/block/202:2: UUID="379de64d-ea11-4f5b-ae6a-0aa50ff7b24d" TYPE="xfs" PARTUUID="fd83c919-41d0-44e7-a69c-00d9a0e6a8e4" 
+/dev/xvda1: PARTUUID="1ea294a2-1b53-4cd5-87d2-aba4bb5f6a19" 
+/dev/xvdb: UUID="ba45f9f7-1b42-401e-9f56-e860ee91152a" TYPE="ext4" 
+/dev/xvdc: UUID="ad2c5b54-0ce8-4f87-9d14-bb3da2b3221b" TYPE="ext4" 
+[ec2-user@ip-172-31-0-35 ~]$ sudo mount UUID=ba45f9f7-1b42-401e-9f56-e860ee91152a /mnt/disco1
+[ec2-user@ip-172-31-0-35 ~]$ sudo mount UUID=ad2c5b54-0ce8-4f87-9d14-bb3da2b3221b /mnt/disco2
+
+HASTA ACA SE PUEDE TRAER 
+
+
+no se hace disponibilidad
+
+
+
+---------------------------
+
+
+sudo mkdir /mnt/disco1/log
+sudo mkdir /mnt/disco2/cloudera
+
+sudo ln -s /mnt/disco1/log  /var/log
+sudo ln -s /mnt/disco2/cloudera /opt/cloudera
+
+
+sudo nano /etc/fstab
+
+(añadir linea por cada UUID )
+
+UUID=aec051b3-03c5-42a4-90aa-666cb9ca855b  /mnt/disco1      ext4  defaults 0 0 
+UUID=03a99f01-12b4-4b0f-a63c-56b60a8f0026 /mnt/disco2      ext4  defaults 0 0 
+
+
+sudo nano /etc/selinux/config
+selinux=disabled
+
+sudo reboot now
+
+sudo su
+echo never > /sys/kernel/mm/transparent_hugepage/enabled
+
+
+sudo sysctl vm.swappiness=1
+
+reboot now
+
+sudo yum install nscd
+sudo yum install ntp
+sudo yum install chrony
+
+sudo systemctl enable ntpd
+sudo systemctl start ntpd
+sudo systemctl status ntpd
+
+
+FIN TODOS LOS SERVERS
+
+
+
+
+HASTA ACAAA NOMAS LA PREPARACION 
+
+
+
+
+
+
+EN MASTER : 
+
+sudo yum install mariadb-server
+sudo service mariadb stop
+
+sudo find / -name my.cnf
+en archivo  my.cnf
+
+reemplazar con :
+
+```
+[mysqld]
+transaction-isolation = READ-COMMITTED
+# Disabling symbolic-links is recommended to prevent assorted security risks;
+# to do so, uncomment this line:
+# symbolic-links = 0
+
+key_buffer = 16M
+key_buffer_size = 32M
+max_allowed_packet = 32M
+thread_stack = 256K
+thread_cache_size = 64
+query_cache_limit = 8M
+query_cache_size = 64M
+query_cache_type = 1
+
+max_connections = 550
+#expire_logs_days = 10
+#max_binlog_size = 100M
+
+#log_bin should be on a disk with enough free space. Replace '/var/lib/mysql/mysql_binary_log' with an appropriate path for your system
+#and chown the specified folder to the mysql user.
+log_bin=/var/lib/mysql/mysql_binary_log
+
+binlog_format = mixed
+
+read_buffer_size = 2M
+read_rnd_buffer_size = 16M
+sort_buffer_size = 8M
+join_buffer_size = 8M
+
+# InnoDB settings
+innodb_file_per_table = 1
+innodb_flush_log_at_trx_commit  = 2
+innodb_log_buffer_size = 64M
+innodb_buffer_pool_size = 4G
+innodb_thread_concurrency = 8
+innodb_flush_method = O_DIRECT
+innodb_log_file_size = 512M
+
+[mysqld_safe]
+log-error=/var/log/mariadb/mariadb.log
+pid-file=/var/run/mariadb/mariadb.pid
+
+```
+
+
+sudo systemctl enable mariadb 
+//sudo systemctl list-unit-files | grep mariadb mariadb.service enabled ???
+
+sudo service mariadb start
+
+
+sudo /usr/bin/mysql_secure_installation ( Clave denise2021! )
+
+
+
+
+copiar archivo ( en todos los servers ) :
+scp -i sergio-camp.pem /home/sergio/Downloads/mysql-connector-java-5.1.44.tar.gz ec2-user@ec2-34-214-55-215.us-west-2.compute.amazonaws.com:/tmp/
+tar zxvf mysql-connector-java-5.1.31.tar.gz
+sudo mkdir -p /usr/share/java/
+sudo cp mysql-connector-java-5.1.44/mysql-connector-java-5.1.44-bin.jar /usr/share/java/mysql-connector-java.jar
+
+
+
+
+
+
+mysql -u root -p
+
+create database cds DEFAULT CHARACTER SET utf8;
+create database amon DEFAULT CHARACTER SET utf8;
+create database rman DEFAULT CHARACTER SET utf8;
+create database metastore DEFAULT CHARACTER SET utf8;
+create database sentry DEFAULT CHARACTER SET utf8;
+create database nav DEFAULT CHARACTER SET utf8;
+create database navms DEFAULT CHARACTER SET utf8;
+create database hue DEFAULT CHARACTER SET utf8;
+create database oozie default character set utf8;
+
+para la DB DEL CLOUDERA SERVER MANAGER
+create database scm default character set utf8;
+
+grant all on cds.* TO 'cds'@'%' IDENTIFIED BY 'cds_password';
+grant all on amon.* TO 'amon'@'%' IDENTIFIED BY 'amon_password';
+grant all on rman.* TO 'rman'@'%' IDENTIFIED BY 'rman_password';
+grant all on metastore.* TO 'hive'@'%' IDENTIFIED BY 'hive_password';
+grant all on sentry.* TO 'sentry'@'%' IDENTIFIED BY 'sentry_password';
+grant all on nav.* TO 'nav'@'%' IDENTIFIED BY 'nav_password';
+grant all on navms.* TO 'navms'@'%' IDENTIFIED BY 'navms_password';
+grant all on hue.* TO 'hue'@'%' IDENTIFIED BY 'hue_password';
+
+grant all privileges on oozie.* to 'oozie'@'localhost' identified by 'oozie';
+grant all privileges on oozie.* to 'oozie'@'%' identified by 'oozie';
+grant all on oozie.* TO 'oozie'@'%' IDENTIFIED BY 'oozie';
+
+
+grant all on scm.* TO 'scm'@'%' IDENTIFIED BY 'scm_password';
+grant all privileges on scm.* to 'scm'@'localhost' identified by 'scm_password';
+grant all privileges on scm.* to 'scm'@'%' identified by 'scm_password';
+
+exit mariadb
+
+
+
+
+en el archivo cloudera-manager.repo dentro de /etc/yum.repos.d/
+
+copiar :
+
+
+[cloudera-manager]
+# Packages for Cloudera Manager, Version 5, on RedHat or CentOS 5 x86_64
+name=Cloudera Manager
+baseurl=https://archive.cloudera.com/cm5/redhat/5/x86_64/cm/5/
+gpgkey =https://archive.cloudera.com/cm5/redhat/5/x86_64/cm/RPM-GPG-KEY-cloudera 
+gpgcheck = 1
+
+
+
+GRABO
+
+
+SOLO EN MASTER instalo el openjdk
+sudo yum install oracle-j2sdk1.7
+
+
+corro script
+/usr/share/cmf/schema/scm_prepare_database.sh mysql  scm scm scm_password
+sudo service cloudera-scm-server start
+
+http://ec2-52-41-19-229.us-west-2.compute.amazonaws.com:7180
+
+arranco el GUI
+
+borro las parcelas y copia esta nueva :
+
+https://archive.cloudera.com/cdh5/parcels/5.11.0/
+
+cambiar usuario por el de amazon , elijo el pem
+
+check en instalar OpenJDK 
+
+SINGLE USER MODE NOOOOOOOOOOOOO
+
+Aparece un Warning de Transparent_hugepage y sWapiness
+
+ en cada maquina
+
+echo never > /sys/kernel/mm/transparent_hugepage/defrag
+echo never > /sys/kernel/mm/transparent_hugepage/enabled
+
+y luego en el archivo 
+nano /etc/rc.local
+agregar tambien PARA CADA SERVER
+
+CONTINUAR CON LA INSTALACION
+
+
+
+
+
+
+Security Kerberos
+
+cambiar port HUE
+checkbox bind namenode en HDFS 
+
+reiniciar
+
+en HUE tab > WEB UI install HIVE examples 
+
+
+en Servidor MASTER 
+sudo yum -y install krb5-server krb5-libs krb5-auth-dialog krb5-workstation
+
+
+
+ESTE EN TODOS LOS SERVERS
+yum -y install krb5-workstation krb5-libs krb5-auth-dialog
+
+EN EL SERVER NOMAS 
+sudo nano /var/kerberos/krb5kdc/kdc.conf
+
+AGNOSTIC.COM 
+
+y las dos lineas 
+max_life = 1d 
+max_renewable_life = 7d
+
+
+
+EN TODOS LOS CLUSTER : 
+
+/etc/krb5.conf 
+[logging]
+ default = FILE:/var/log/krb5libs.log
+ kdc = FILE:/var/log/krb5kdc.log
+ admin_server = FILE:/var/log/kadmind.log
+
+[libdefaults]
+ default_realm = SERGIOSADANIOWSKI.HQ
+ dns_lookup_realm = false
+ dns_lookup_kdc = false
+ ticket_lifetime = 24h
+ renew_lifetime = 7d
+ forwardable = true
+ udp_preference_limit = 1
+ default_tgs_enctypes = arcfour-hmac
+ default_tkt_enctypes = arcfour-hmac 
+
+ [realms]
+	AGNOSTIC.COM = {
+        kdc = ip-172-31-38-137.us-west-2.compute.internal
+        admin_server = ip-172-31-38-137.us-west-2.compute.internal
+        }
+
+
+[domain_realm]
+   .us-west-2.compute.internal = SERGIOSADANIOWSKI.HQ
+   us-west-2.compute.internal = SERGIOSADANIOWSKI.HQ
+
+
+
+EN SERVER 
+
+sudo /usr/sbin/kdb5_util create -s
+
+
+
+sudo kadmin.local
+kadmin.local:  addprinc haley@SERGIOSADANIOWSKI.HQ
+WARNING: no policy specified for cloudera-scm@SERGIOSADANIOWSKI.HQ; defaulting to no policy
+Enter password for principal "cloudera-scm@SERGIOSADANIOWSKI.HQ":
+Re-enter password for principal "cloudera-scm@SERGIOSADANIOWSKI.HQ":
+Principal "cloudera-scm@AGNOSTIC.COM" created.
+
+
+sudo nano /var/kerberos/krb5kdc/kadm5.acl 
+*/admin@AGNOSTIC.COM *
+cloudera-scm@SERGIOSADANIOWSKI.HQ admilc
+
+
+sudo kadmin.local
+kadmin.local:  addpol admin
+kadmin.local:  addpol users
+kadmin.local:  addpol hosts
+kadmin.local:  exit
+
+
+denise2021!
+
+EN EL WIZARD agregar el HOST DEL KDC SINO NO FUNCA
+
+ip-172-31-0-35.us-west-2.compute.internal
+
+
+
+
+
+
+
+
+
+<property>
+  <name>hive.server2.authentication</name>
+  <value>KERBEROS</value>
+</property>
+<property>
+  <name>hive.server2.authentication.kerberos.principal</name>
+  <value>hive/_HOST@AGNOSTIC.COM</value>
+</property>
+<property>
+ <name>hive.stats.ndv.error</name>
+ <value>5.0</value>
+</property>
+
+
+
+IMPERSONAR UN USER DE KERBEROS 
+sudo su
+cd /var/run/cloudera-scm-agent/process/
+cd ELNODE DEL ROLE A CARGARSE
+ ls 
+kinit hdfs/$(hostname -f)@AGNOSTIC.COM -kt hdfs.keytab
+
+klist para ver que estoy impersonado con el user
+hdfs dfs -chmod -R 771 /user/hive/warehouse  SIN SUDO
+hdfs dfs -chown -R hive:hive /user/hive/warehouse
+
+
+
+
+install service Sentry
+
+agrego el primary group de mi usuario de la pc 
+
+cat /etc/group
+
+sergiosadaniowski como supergroup en hive en CM
+
+en consola
+agregar mi usuario al kerveros principal
+
+kinit addprinc sergiosadaniowski@AGNOSTIC.COM
+
+
+luego
+
+beeline
+
+
+!connect jdbc:hive2://localhost:10000/default;principal=hive/ip-172-31-0-35.us-west-2.compute.internal@REALM.COM
+
+Show tables;
+
+
+
+curl -u admin:admin http://ec2-34-214-97-49.us-west-2.compute.amazonaws.com:7180/hosts
+
+curl  -u admin:admin 'http://ec2-34-214-96-250.us-west-2.compute.amazonaws.com:7180/api/v8/clusters/sergiosadaniowski/services'
+
+curl -u sergiosadaniowski:cloudera http://ec2-52-41-19-229.us-west-2.compute.amazonaws.com:7180/static/apidocs/
+
+curl -u sergiosadaniowski:cloudera http://ec2-52-41-19-229.us-west-2.compute.amazonaws.com:7180/clusters/cluster/services/hive/commands
+
+curl -u sergiosadaniowski:cloudera http://ec2-52-41-19-229.us-west-2.compute.amazonaws.com:7180/api/v17/cm/deployment >> salida_curl.cmd
+
+
+
+curl -u username:password http://<cm-host>:7180/api/v12/clusters/<cluster-name>/services/<impala-name>/roles/
+
+curl -u sergiosadaniowski:cloudera http://ec2-52-41-19-229.us-west-2.compute.amazonaws.com:7180/api/v17/clusters/cluster/services/hive/command/stop
+
+curl -u sergiosadaniowski:cloudera -X POST -H "Content-Type:application/json" -d '{"items": ["hive-HIVESERVER2-1d5ebd2b0df1b3b2fa19e60d48650a06"]}' 'http://ec2-52-41-19-229.us-west-2.compute.amazonaws.com:7180/api/v17/clusters/cluster/services/hive/roleCommands/stop'
+
+
+curl -X POST -u sergiosadaniowski:cloudera -v 'http://ec2-52-41-19-229.us-west-2.compute.amazonaws.com:7180/api/v17/clusters/cluster/services/hive/roleCommands/stop'
+
+curl -k -iv -X POST  -u sergiosadaniowski:cloudera -i -v -H "content-type:application/json"  'http://ec2-52-41-19-229.us-west-2.compute.amazonaws.com:7180/api/v17/clusters/cluster/services/hive/roleCommands/stop'
+
+
+
+
+
+
+curl -u sergiosadaniowski:cloudera -X GET http://ec2-52-41-19-229.us-west-2.compute.amazonaws.com:7180/api/v17/clusters/cluster/services/hive/
+
+curl -u 'sergiosadaniowski:cloudera' -X GET http://ec2-52-41-19-229.us-west-2.compute.amazonaws.com:7180/api/v17/hosts
+
+
+curl -u 'sergiosadaniowski:cloudera' -X POST -H "Content-Type:application/json" -d '{"items":["hive-HIVESERVER2-1d5ebd2b0df1b3b2fa19e60d48650a06"]}' 'http://ec2-52-41-19-229.us-west-2.compute.amazonaws.com:7180/api/v17/clusters/cluster/services/hive/roleCommands/restart'
+
+
+curl -X POST -u sergiosadaniowski:cloudera 'http://ec2-52-41-19-229.us-west-2.compute.amazonaws.com:7180/api/v17/clusters/cluster/services/hive/config?view=full'
+
+curl -u sergiosadaniowski:cloudera 'http://ec2-52-41-19-229.us-west-2.compute.amazonaws.com:7180/api/v17/clusters/cluster/services/hive/config?view=full'
+
+
+curl -X POST -u ergiosadaniowski:cloudera 'http://localhost:7180/api/v1/clusters/darwinmartinezagnostic/services/hive/commands/start'
+
+curl -X POST -u sergiosadaniowski:cloudera 'http://ec2-52-41-19-229.us-west-2.compute.amazonaws.com:7180/api/v1/clusters/cluster/services/hive/commands/start'
+
+
+
+UPGRADE
+
+STOP MAnagment Service
+
+bakcupd DATABASE
+
+sudo service cloudera-scm-server stop
+sudo service cloudera-scm-agent stop
+
+
+change repo en yum 
+
+/etc/yum.repos.d/cloudera repo
+
+cambiar la linea baseurl = con la url de la version a bajar 
+
+http://archive.cloudera.com/cm5/redhat/7/x86_64/cm/5.12.0/
+
+
+grabar 
+
+
+
+sudo yum clean all
+sudo yum upgrade cloudera-manager-server cloudera-manager-daemons cloudera-manager-agent
+
+
+sudo service cloudera-scm-server start
+
+
+
+
+time hadoop jar /opt/cloudera/parcels/CDH/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar teragen -Ddfs.block.size=33554432 -Dmapred.map.tasks=12 -Dmapreduce.map.memory.mb=512 65536000 tgen

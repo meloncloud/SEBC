@@ -1,0 +1,374 @@
+crear intancias EC2 en AWS
+
+Red Hat Enterprise Linux (RHEL) 7.2 (HVM)
+
+4 intances m3.2xlarge  con dos HD extras de 120 gb
+
+Conectarse a todas los servers y realizar los siguientes pasos
+
+(Preconfiguracion) :
+
+
+EN CADA SERVER :
+
+sudo mkfs.ext4 /dev/xvdb | sudo mkfs.ext4 /dev/xvdc
+
+sudo mkdir /mnt/disco2  |  sudo mkdir /mnt/disco1
+
+[ec2-user@ip-172-31-8-198 ~]$ sudo blkid
+/dev/block/202:2: UUID="379de64d-ea11-4f5b-ae6a-0aa50ff7b24d" TYPE="xfs" PARTUUID="fd83c919-41d0-44e7-a69c-00d9a0e6a8e4" 
+/dev/xvda1: PARTUUID="1ea294a2-1b53-4cd5-87d2-aba4bb5f6a19" 
+/dev/xvdb: UUID="ba45f9f7-1b42-401e-9f56-e860ee91152a" TYPE="ext4" 
+/dev/xvdc: UUID="ad2c5b54-0ce8-4f87-9d14-bb3da2b3221b" TYPE="ext4" 
+[ec2-user@ip-172-31-0-35 ~]$ sudo mount UUID=ba45f9f7-1b42-401e-9f56-e860ee91152a /mnt/disco1
+[ec2-user@ip-172-31-0-35 ~]$ sudo mount UUID=ad2c5b54-0ce8-4f87-9d14-bb3da2b3221b /mnt/disco2
+
+
+
+
+
+
+
+
+
+sudo mkdir /mnt/disco1/log |  sudo mkdir /mnt/disco2/cloudera
+
+sudo ln -s /mnt/disco1/log  /var/log | sudo ln -s /mnt/disco2/cloudera /opt/cloudera
+
+sudo yum install nano 
+
+sudo blkid
+sudo nano /etc/fstab
+
+(añadir linea por cada UUID )
+
+UUID=aec051b3-03c5-42a4-90aa-666cb9ca855b  /mnt/disco1      ext4  defaults 0 0 
+UUID=03a99f01-12b4-4b0f-a63c-56b60a8f0026 /mnt/disco2      ext4  defaults 0 0 
+
+
+sudo nano /etc/selinux/config
+selinux=disabled
+
+sudo reboot now
+
+
+*****
+
+
+sudo yum install nscd
+sudo yum install ntp
+sudo yum install chrony
+
+sudo systemctl enable ntpd
+sudo systemctl start ntpd
+sudo systemctl status ntpd
+
+
+
+en cada server agregar
+
+sudo useradd -u 2800 saturn | sudo useradd -u 2900 haley
+sudo groupadd comets | sudo groupadd planets
+sudo usermod -a -G comets haley | sudo usermod -a -G planets saturn
+
+
+
+
+copiar archivo ( en todos los servers (NO INSTALAR)) :
+scp -i key_sergio_challenge.pem /home/sergio/Downloads/mysql-connector-java-5.1.44.tar.gz ec2-user@ec2-54-186-246-44.us-west-2.compute.amazonaws.com:/tmp/
+
+scp -i key_sergio_challenge.pem /home/sergio/Downloads/mysql-connector-java-5.1.44.tar.gz ec2-user@ec2-34-214-96-250.us-west-2.compute.amazonaws.com:/tmp/
+
+scp -i key_sergio_challenge.pem /home/sergio/Downloads/mysql-connector-java-5.1.44.tar.gz ec2-user@ec2-34-215-50-32.us-west-2.compute.amazonaws.com:/tmp/
+
+scp -i key_sergio_challenge.pem /home/sergio/Downloads/mysql-connector-java-5.1.44.tar.gz ec2-user@ec2-34-214-97-49.us-west-2.compute.amazonaws.com:/tmp/
+
+
+
+
+FIN TODOS LOS SERVERS !!!!!!!! listoooooo
+
+
+
+
+
+
+ACA YA ES PARA EL CHANGELLE NO HACER EN SERVERS FINALES 
+
+
+EN MASTER : 
+
+REF : https://dbahire.com/como-instalar-mysql-5-6-en-centos-7/
+
+sudo yum install http://dev.mysql.com/get/mysql-community-release-el7-5.noarch.rpm
+
+chequeo :
+sudo yum repolist enabled | grep "mysql.*-community.*"
+
+sudo yum install mysql-community-server
+
+sudo systemctl start mysqld
+
+chequeo : 
+sudo systemctl status mysqld
+
+
+
+sudo systemctl stop mysqld
+
+sudo find / -name my.cnf
+sudo nano  /etc/my.cnf
+
+reemplazar con :
+
+```
+[mysqld]
+transaction-isolation = READ-COMMITTED
+# Disabling symbolic-links is recommended to prevent assorted security risks;
+# to do so, uncomment this line:
+# symbolic-links = 0
+
+key_buffer_size = 32M
+max_allowed_packet = 32M
+thread_stack = 256K
+thread_cache_size = 64
+query_cache_limit = 8M
+query_cache_size = 64M
+query_cache_type = 1
+
+max_connections = 550
+#expire_logs_days = 10
+#max_binlog_size = 100M
+
+#log_bin should be on a disk with enough free space. Replace '/var/lib/mysql/mysql_binary_log' with an appropriate path for your system
+#and chown the specified folder to the mysql user.
+log_bin=/var/lib/mysql/mysql_binary_log
+
+# For MySQL version 5.1.8 or later. For older versions, reference MySQL documentation for configuration help.
+binlog_format = mixed
+
+read_buffer_size = 2M
+read_rnd_buffer_size = 16M
+sort_buffer_size = 8M
+join_buffer_size = 8M
+
+# InnoDB settings
+innodb_file_per_table = 1
+innodb_flush_log_at_trx_commit  = 2
+innodb_log_buffer_size = 64M
+innodb_buffer_pool_size = 4G
+innodb_thread_concurrency = 8
+innodb_flush_method = O_DIRECT
+innodb_log_file_size = 512M
+
+[mysqld_safe]
+log-error=/var/log/mysqld.log
+pid-file=/var/run/mysqld/mysqld.pid
+
+sql_mode=STRICT_ALL_TABLES
+
+```
+
+sudo /sbin/chkconfig mysqld on $ sudo /sbin/chkconfig --list mysqld mysqld 0:off 1:off 2:on 3:on 4:on 5:on 6:off
+
+
+
+
+sudo service mysqld start
+
+
+
+
+
+sudo /usr/bin/mysql_secure_installation (pass denise2021! )
+[...]
+Enter current password for root (enter for none):
+OK, successfully used password, moving on...
+[...]
+Set root password? [Y/n] y
+New password:
+Re-enter new password:
+Remove anonymous users? [Y/n] Y
+[...]
+Disallow root login remotely? [Y/n] N
+[...]
+Remove test database and access to it [Y/n] Y
+[...]
+Reload privilege tables now? [Y/n] Y
+All done!
+
+
+Installing the MariaDB JDBC Driver
+
+
+
+
+en cada server 
+cd /tmp
+tar zxvf mysql-connector-java-5.1.44.tar.gz
+sudo mkdir -p /usr/share/java/
+sudo cp mysql-connector-java-5.1.44/mysql-connector-java-5.1.44-bin.jar /usr/share/java/mysql-connector-java.jar
+
+
+
+
+mysql -u root -p  (Error ? https://stackoverflow.com/questions/4448467/cant-connect-to-local-mysql-server-through-socket-var-lib-mysql-mysql-sock)
+
+create database scm default character set utf8;
+grant all on scm.* TO 'scm'@'%' IDENTIFIED BY 'scm_password';
+
+create database amon DEFAULT CHARACTER SET utf8;
+grant all on amon.* TO 'amon'@'%' IDENTIFIED BY 'amon_password';
+
+
+create database rman DEFAULT CHARACTER SET utf8;
+grant all on rman.* TO 'rman'@'%' IDENTIFIED BY 'rman_password';
+
+
+create database metastore DEFAULT CHARACTER SET utf8;
+grant all on metastore.* TO 'hive'@'%' IDENTIFIED BY 'hive_password';
+
+create database sentry DEFAULT CHARACTER SET utf8;
+grant all on sentry.* TO 'sentry'@'%' IDENTIFIED BY 'sentry_password';
+
+
+create database nav DEFAULT CHARACTER SET utf8;
+grant all on nav.* TO 'nav'@'%' IDENTIFIED BY 'nav_password';
+
+
+create database navms DEFAULT CHARACTER SET utf8;
+grant all on navms.* TO 'navms'@'%' IDENTIFIED BY 'navms_password';
+
+
+create database hue DEFAULT CHARACTER SET utf8;
+grant all on hue.* to 'hue'@'localhost' identified by 'hue_password';
+grant all on hue.* TO 'hue'@'%' IDENTIFIED BY 'hue_password';
+
+
+create database oozie default character set utf8;
+grant all privileges on oozie.* to 'oozie'@'localhost' identified by 'oozie';
+grant all privileges on oozie.* to 'oozie'@'%' identified by 'oozie';
+
+
+Add the Mysql JDBC Driver JAR to Oozie
+
+sudo mkdir /opt/cloudera/parcels/CDH/lib/oozie/lib/
+cd /tmp
+sudo cp mysql-connector-java-5.1.44/mysql-connector-java-5.1.44-bin.jar /var/lib/oozie/mysql-connector-java.jar
+
+
+
+
+
+
+en master :
+
+
+crear archivo 
+ sudo nano /etc/yum.repos.d/cloudera-manager.repo
+
+ copiar adentro :
+
+ [cloudera-manager]
+# Packages for Cloudera Manager, Version 5, on RedHat or CentOS 7 x86_64           	  
+name=Cloudera Manager
+baseurl=https://archive.cloudera.com/cm5/redhat/7/x86_64/cm/5.11.0/
+gpgkey =https://archive.cloudera.com/cm5/redhat/7/x86_64/cm/RPM-GPG-KEY-cloudera    
+gpgcheck = 1
+
+
+Grabo
+
+
+SOLO EN MASTER instalo el openjdk
+
+sudo yum install oracle-j2sdk1.7
+sudo yum install cloudera-manager-daemons cloudera-manager-server
+
+corro script (chequear la bd que este creada primero)
+sudo /usr/share/cmf/schema/scm_prepare_database.sh mysql  scm scm scm_password
+sudo /usr/share/cmf/schema/scm_prepare_database.sh mysql -h 54.186.246.44 scm scm scm_password
+
+arranco el server de cloudera
+
+sudo service cloudera-scm-server start -h 54.186.246.44
+
+
+// antes de arrancar la web hacer esto 
+
+(hacer lo siguiente en todas las maquinas)
+
+sudo sysctl vm.swappiness=1
+
+sudo su (primero para esto)
+echo never > /sys/kernel/mm/transparent_hugepage/defrag
+echo never > /sys/kernel/mm/transparent_hugepage/enabled
+
+
+y luego en el archivo 
+nano /etc/rc.local 
+agregar : 
+echo never > /sys/kernel/mm/transparent_hugepage/defrag
+echo never > /sys/kernel/mm/transparent_hugepage/enabled
+
+
+
+
+
+
+
+
+voy a la url publicdns:7180
+
+admin admin
+
+
+Ingreso las 4 ips PRIVADAS  
+
+
+172.31.9.71
+172.31.38.137
+172.31.4.34
+172.31.14.139
+
+
+
+en parcelas : MORE OPTION  , borro todas y agrego esta
+
+https://archive.cloudera.com/cdh5/parcels/5.9/  PARA EL CHANLLENGE
+
+
+
+CHEQUEAR el checkbox instalar ORACLE JAVA  ANTES DE CONTINUAR
+
+NO SELECCIONAR SINGLE USER MODE NOOOOOO
+
+
+en usuario  seleccionar opciones
+
+Login To All Hosts As 
+		Another user  (ingresar el usuario de amazon ec2-user )
+
+All hosts accept same private key
+
+cargar la pem
+
+key_sergio_challenge.pem
+
+
+dar en continuar 
+
+
+Zookeeper DEBE ESTAR EN TRENS NODOS replicados !!!
+
+
+
+
+https://access.redhat.com/solutions/10021
+
+https://access.redhat.com/discussions/685843
+
+
+time hadoop jar /opt/cloudera/parcels/CDH/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar teragen -Ddfs.block.size=33554432 -Dmapred.map.tasks=12 -Dmapreduce.map.memory.mb=512 51200000 tgen
+
+         hdfs_client_java_heapsize
